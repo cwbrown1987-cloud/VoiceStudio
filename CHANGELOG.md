@@ -92,6 +92,7 @@ metadata and the backend fallback mirror it.
 
 - macOS builds without a Developer ID are now signed ad hoc so the bundle signature is valid, and the shell installer clears quarantine, repairs an invalid signature of older releases, names an unreadable disk image, and tells Intel Mac users the backend needs Apple Silicon (#3033, #2763, #2829, #2681)
 - A "Generation failed" log line now says where it was raised and which error caused it, and the out-of-memory advice mentions picking another GPU, so these reports can be told apart (#2895, #2684, #2666, #2626, #2622, #2580, #3034)
+- Opt-in Windows ROCm setup installs and verifies a matched AMD stack for source and Electron, with pinned HIP faster-whisper support and explicit optional-engine limits, incorporating focused work from #2600 and #2607 (#3045) — thanks @Pates2004!
 
 ### CI
 
