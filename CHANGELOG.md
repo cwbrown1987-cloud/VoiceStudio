@@ -27,6 +27,7 @@ metadata and the backend fallback mirror it.
 - Phone apps now use the app ID `sh.voicestudio.mobile`; a preview build installed before installs alongside as a new app, so pair it again and remove the old one (#3194)
 
 ### Added
+- Opt-in native Windows ROCm source bootstrap with a reusable pinned recipe, hash-checked CTranslate2 wheels and offline GPU smoke; packaged setup and app GPU support are unchanged (#2468)
 
 - Bug reports and Settings → Diagnostics now show the build commit next to the version, so beta and preview builds of one version can be told apart (#3293)
 - The backend and Docker images report their build commit in `/system/info` and in bug reports (#3293)
