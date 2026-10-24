@@ -23,7 +23,7 @@ uv run scripts/render_brand_icons.py
 ```
 
 It renders `docs/logo.svg` to the README PNGs and every PNG, ICO and ICNS under
-`electron/build/icons/` (the ICNS only on macOS, which has `iconutil`). Then run
+`electron/build/icons/` (the ICNS only on macOS, which has `iconutil`). The macOS artwork is fitted to Apple's icon grid by the script. Then run
 the Electron packaging contract. Keep `fill="none"` on the waveform path in every
 SVG copy of the mark; without it the curve fills black.
 
@@ -31,6 +31,10 @@ Android generates its vectors from the same SVG with
 `mobile/android/scripts/generate_brand_resources.py`. SVG paint `none` becomes
 transparent Android color before applying the monochrome treatment, so the
 waveform stays unfilled in both standard and themed icons.
+
+macOS artwork (`icon.icns` and `icon-macos.png`) keeps Apple's icon grid: the tile
+spans the centred 824 px of a 1024 px canvas, so it matches other apps in the Dock,
+Launchpad and Finder. `tests/test_macos_icon_grid.py` checks it.
 
 Do not redraw the waveform per screen. Use `VoiceStudioMark` in React and the
 canonical SVG elsewhere so the silhouette stays recognizable at 16–512 px.
@@ -73,6 +77,7 @@ Visible copy can explain those compatibility names, but must not silently rename
 them on disk or over the wire.
 
 Electron uses the shared multi-resolution ICO for Windows window/taskbar and tray
-icons, the shared PNG for Linux and macOS runtime icons, and the ICNS for the macOS
-bundle. The tray icon restores the window; closing the app retains its existing
-quit behavior. Installed executable icons are applied when building the installer.
+icons, the shared PNG for Linux runtime icons, `icon-macos.png` for the macOS Dock at
+runtime, and the ICNS for the macOS bundle. The tray icon restores the window;
+closing the app retains its existing quit behavior. Installed executable icons are
+applied when building the installer.
