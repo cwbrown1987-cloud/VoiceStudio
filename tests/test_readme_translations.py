@@ -11,8 +11,8 @@ _TRANSLATIONS = sorted((_ROOT / "docs" / "readme").glob("README_*.md"))
 _TARGET = re.compile(r'(?:src="|href="|\]\()([^")\s]+)')
 
 
-def test_both_translations_are_present_and_the_root_readme_links_to_them():
-    assert {p.name for p in _TRANSLATIONS} == {"README_CN.md", "README_JA.md"}
+def test_translations_are_present_and_the_root_readme_links_to_them():
+    assert {p.name for p in _TRANSLATIONS} == {"README_CN.md", "README_JA.md", "README_KO.md"}
     root = (_ROOT / "README.md").read_text(encoding="utf-8")
     for path in _TRANSLATIONS:
         assert f'href="docs/readme/{path.name}"' in root
