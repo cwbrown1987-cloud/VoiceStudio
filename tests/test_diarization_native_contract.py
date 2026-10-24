@@ -68,3 +68,77 @@ def test_native_sortformer_rejects_large_boundary_overshoot():
             },
             frames,
         )
+
+
+def _read_turns_output(path):
+    # Resolved at call time so a replaced module in sys.modules is not stale.
+    from services import diarization_native
+
+    return diarization_native._read_turns_output(path)
+
+
+def test_validated_turn_rejects_non_object_turn():
+    with pytest.raises(ValueError, match="Invalid native speaker-turn"):
+        _validated_turn(7, 16000)
+
+
+def test_read_turns_output_handles_missing_file(tmp_path):
+    # A zero-exit subprocess whose output file was never created (deleted by
+    # the OS, lost to a container restart, etc.) must not bubble up a raw
+    # FileNotFoundError. _read_turns_output wraps the read+parse in a clear
+    # RuntimeError so the caller can log a diagnostic.
+    missing = tmp_path / "turns.json"
+    with pytest.raises(RuntimeError, match="could not be read as UTF-8"):
+        _read_turns_output(missing)
+
+
+def test_read_turns_output_handles_non_utf8_bytes(tmp_path):
+    # The sidecar wrote some bytes that the file system kept but a
+    # UTF-8 read cannot decode. This typically happens when the
+    # subprocess is killed mid-write or when a binary blob is
+    # concatenated with the JSON payload.
+    bad = tmp_path / "turns.json"
+    bad.write_bytes(b"\xff\xfe" + b'{"start_sample": 0')
+    with pytest.raises(RuntimeError, match="could not be read as UTF-8"):
+        _read_turns_output(bad)
+
+
+def test_read_turns_output_handles_truncated_json(tmp_path):
+    # The file is text and decodes, but the JSON itself stops mid-record.
+    # Older versions of the call site let json.JSONDecodeError propagate; the
+    # wrapper must turn it into a clear RuntimeError naming the file.
+    truncated = tmp_path / "turns.json"
+    truncated.write_text('[{"start_sample": 0, "end_sample": 1280', encoding="utf-8")
+    with pytest.raises(RuntimeError, match="is not valid JSON"):
+        _read_turns_output(truncated)
+
+
+def test_read_turns_output_handles_empty_file(tmp_path):
+    # An empty file is not valid JSON, so it trips the JSON-decode guard
+    # before reaching the ``isinstance(turns, list)`` check. The wrapped
+    # error is a ``RuntimeError`` with a clear "is not valid JSON" message.
+    empty = tmp_path / "turns.json"
+    empty.write_text("", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="is not valid JSON"):
+        _read_turns_output(empty)
+
+
+def test_read_turns_output_handles_non_list_payload(tmp_path):
+    # A dict (or any other non-list) at the top level is also rejected
+    # by the type guard, not by JSON syntax.
+    obj = tmp_path / "turns.json"
+    obj.write_text('{"turns": []}', encoding="utf-8")
+    with pytest.raises(ValueError, match="Invalid native speaker-turn output"):
+        _read_turns_output(obj)
+
+
+def test_read_turns_output_parses_valid_list(tmp_path):
+    # The happy path: a well-formed list of turn records round-trips.
+    ok = tmp_path / "turns.json"
+    ok.write_text(
+        '[{"start_sample": 0, "end_sample": 1280, "speaker_id": "SPEAKER_00"}]',
+        encoding="utf-8",
+    )
+    assert _read_turns_output(ok) == [
+        {"start_sample": 0, "end_sample": 1280, "speaker_id": "SPEAKER_00"},
+    ]
