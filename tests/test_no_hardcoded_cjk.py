@@ -50,6 +50,7 @@ _ALLOWED_FILES = {
     "README.md",                                  # native language-switcher link
     "docs/readme/README_CN.md",                   # Chinese README (a translation)
     "docs/readme/README_JA.md",                   # Japanese README (a translation)
+    "docs/readme/README_RU.md",                   # Russian README (links to the CN/JA translations by native name)
     "docs/data_preparation.md",                   # multilingual example payloads
     "docs/voice-design.md",                       # EN/CJK attribute mapping table
     "docs/engines/omnivoice.md",                  # pinyin pronunciation-control example (functional CJK)
