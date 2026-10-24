@@ -5,6 +5,7 @@ import { apiJson } from '@/lib/api/client';
 import { consumeTaskStream, IncompleteTaskStreamError } from '@/lib/api/event-stream';
 import {
   applyDubTranslationRows,
+  replaceDubSegmentTexts,
   uploadDub,
   setDubProduction,
   setDubFitOptions,
@@ -182,6 +183,99 @@ it('keeps timing-fit provenance for every agent-translated target language', asy
   dubSession.setState((current) => ({ ...current, quality: 'fast', agentCli: undefined }));
   vi.clearAllMocks();
   delete (window as Partial<Window>).voicestudio;
+});
+
+it('replaces spoken text from find-and-replace as one undoable edit', () => {
+  dubSession.setState((current) => ({
+    ...current,
+    phase: 'editing',
+    recovery: null,
+    segments: [
+      {
+        id: 'a',
+        start: 0,
+        end: 1,
+        text: 'Hello ACME',
+        text_original: 'Hello ACME',
+        translations: { es: 'Hola ACME' },
+      },
+      {
+        id: 'b',
+        start: 1,
+        end: 2,
+        text: 'Later',
+        text_original: 'Later',
+        translations: { es: 'Luego' },
+      },
+    ],
+  }));
+  clearDubEditHistory();
+  expect(replaceDubSegmentTexts([{ id: 'a', text: 'Hello Apex' }], 'es')).toBe(1);
+  expect(dubSession.state.segments[0]).toMatchObject({
+    text: 'Hello Apex',
+    translations: { es: 'Hello Apex' },
+  });
+  expect(dubSession.state.segments[1].text).toBe('Later');
+  undoDubEdit();
+  expect(dubSession.state.segments[0].text).toBe('Hello ACME');
+  expect(dubSession.state.segments[0].translations).toEqual({ es: 'Hola ACME' });
+});
+
+it('does not mark untranslated rows as translated when find-and-replace edits them', () => {
+  dubSession.setState((current) => ({
+    ...current,
+    phase: 'editing',
+    recovery: null,
+    segments: [
+      { id: 'a', start: 0, end: 1, text: 'Hello ACME', text_original: 'Hello ACME' },
+      {
+        id: 'b',
+        start: 1,
+        end: 2,
+        text: 'Bye ACME',
+        text_original: 'Bye ACME',
+        translations: { fr: 'Au revoir ACME' },
+      },
+    ],
+  }));
+  clearDubEditHistory();
+  expect(
+    replaceDubSegmentTexts(
+      [
+        { id: 'a', text: 'Hello Apex' },
+        { id: 'b', text: 'Bye Apex' },
+      ],
+      'es',
+    ),
+  ).toBe(2);
+  expect(dubSession.state.segments[0].text).toBe('Hello Apex');
+  expect(dubSession.state.segments[0].translations).toBeUndefined();
+  expect(dubSession.state.segments[1].translations).toEqual({ fr: 'Au revoir ACME' });
+});
+
+it('keeps back-to-back find-and-replace actions as separate undo steps', () => {
+  dubSession.setState((current) => ({
+    ...current,
+    phase: 'editing',
+    recovery: null,
+    segments: [
+      { id: 'a', start: 0, end: 1, text: 'ACME one', text_original: 'ACME one' },
+      { id: 'b', start: 1, end: 2, text: 'ACME two', text_original: 'ACME two' },
+    ],
+  }));
+  clearDubEditHistory();
+  expect(replaceDubSegmentTexts([{ id: 'a', text: 'Apex one' }])).toBe(1);
+  expect(replaceDubSegmentTexts([{ id: 'b', text: 'Apex two' }])).toBe(1);
+  undoDubEdit();
+  expect(dubSession.state.segments.map((segment) => segment.text)).toEqual([
+    'Apex one',
+    'ACME two',
+  ]);
+  undoDubEdit();
+  expect(dubSession.state.segments.map((segment) => segment.text)).toEqual([
+    'ACME one',
+    'ACME two',
+  ]);
 });
 
 it('supports reversible insert, delete, merge, and split edits without losing speaker attribution', () => {

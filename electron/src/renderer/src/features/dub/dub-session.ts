@@ -580,6 +580,31 @@ export function assignDubSpeakerProfile(speakerId: string, profileId: string) {
   if (changed) commitSegmentEdit(next);
 }
 
+export function replaceDubSegmentTexts(
+  updates: ReadonlyArray<{ id: string; text: string }>,
+  targetCode?: string,
+) {
+  if (!updates.length) return 0;
+  const byId = new Map(updates.map((update) => [String(update.id), update.text]));
+  let changed = 0;
+  const next = dubSession.state.segments.map((segment) => {
+    const text = byId.get(String(segment.id));
+    if (text === undefined || text === segment.text) return segment;
+    changed += 1;
+    // Only rewrite an existing target translation; untranslated rows keep
+    // their source words out of translations so they are not counted as done.
+    if (targetCode && segment.translations?.[targetCode] !== undefined) {
+      return patchSegment(segment, {
+        text,
+        translations: { ...segment.translations, [targetCode]: text },
+      });
+    }
+    return patchSegment(segment, { text });
+  });
+  if (!changed) return 0;
+  return commitSegmentEdit(next) ? changed : 0;
+}
+
 export function applyDubTranslationRows(targetCode: string, rows: PasteTranslationRow[]) {
   if (!targetCode || !rows.length) return false;
   const mapped = new Map(
