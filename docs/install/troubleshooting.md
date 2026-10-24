@@ -348,6 +348,14 @@ peak memory footprint that exceeds free VRAM. Windows-only quirk.
 
 **Linked issue:** [#65](https://github.com/debpalash/VoiceStudio/issues/65)
 
+## 5c. OmniVoice is not preloaded at startup
+
+Startup only preloads the native OmniVoice model when OmniVoice is the selected
+TTS engine (and the host uses its native backend). Selecting another engine,
+such as VoxCPM2, leaves OmniVoice unloaded at startup to preserve memory for
+that engine. `OMNIVOICE_TTS_BACKEND`, when set, takes precedence over the saved
+engine choice. Models still load on demand when requested.
+
 ## 5a. Backend dies on the first `/generate` (older NVIDIA GPUs, e.g. Tesla T4)
 
 **Symptom:** the backend starts fine, `/health` reports your GPU, the model
