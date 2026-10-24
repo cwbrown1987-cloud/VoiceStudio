@@ -41,6 +41,11 @@ Generate. Persisted provider error pages are discarded and restored to the sourc
 dialogue with a retryable error state.
 
 Long projects virtualize transcript rows, so only the visible editors are mounted.
+The transcript toolbar and waveform timeline stay above that scroll container.
+Selecting a timeline cue, with the mouse or keyboard, reveals its transcript row
+without moving the timeline out of view; timing controls remain available while
+editing long projects. Expanded rows, resized inline notices and dismissed errors
+retain their correct virtualized positions.
 
 The Dubbing pane has a Projects tab beside its controls that lists saved dub projects, newest first. Selecting a project and confirming opens it in place (it waits while a dub is running); the Projects workspace remains the place to save, rename and delete.
 Timeline waveform peaks and onsets are computed once by the backend and cached as a
