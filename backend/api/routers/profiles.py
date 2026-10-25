@@ -129,6 +129,8 @@ async def create_profile(
     personality: str = Form(""),
     kind: str = Form("clone"),
     vd_states: Optional[str] = Form(None),
+    design_recipe: Optional[str] = Form(None),
+    engine: Optional[str] = Form(None),
     image: Optional[UploadFile] = File(None),
 ):
     """Create a voice profile (spec: docs/specs/voice-studio-unification.md §5).
@@ -146,6 +148,8 @@ async def create_profile(
         raise HTTPException(status_code=422, detail="kind must be 'clone' or 'design'")
     if kind == "clone" and ref_audio is None:
         raise HTTPException(status_code=422, detail="clone profiles require ref_audio")
+    stored_recipe = None
+    design_engine = "omnivoice"
     if kind == "design":
         if not (vd_states or "").strip():
             raise HTTPException(status_code=422, detail="design profiles require vd_states")
@@ -178,6 +182,29 @@ async def create_profile(
         # rebuild the tags from vd_states — so the row is always generation-safe
         # regardless of which frontend build saved it.
         instruct = heal_design_instruct(instruct, parsed)
+        if design_recipe is not None:
+            # A native Voice Design prompt is metadata, NOT an OmniVoice
+            # instruct. Validate and keep the full recipe separately from
+            # legacy tags, so saving cannot discard unrecognised adjectives.
+            from api.routers.generation import _design_recipe_json
+            from services.tts_backend import get_backend_class, voice_design_support
+
+            validated = _design_recipe_json(design_recipe)
+            if validated is None:
+                raise HTTPException(status_code=422, detail="Invalid Voice Design recipe")
+            design_engine = engine or "omnivoice"
+            try:
+                backend_cls = get_backend_class(design_engine)
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail="Unknown Voice Design engine") from exc
+            if voice_design_support(backend_cls) is False:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"{design_engine} cannot design a voice without reference audio",
+                )
+            recipe_data = _json.loads(validated)
+            recipe_data["engine"] = design_engine
+            stored_recipe = _json.dumps(recipe_data, ensure_ascii=False)
     else:
         # Clone-kind saves get the same server-side choke point (audit finding:
         # this class — "Unsupported instruct items" 400s on every later use —
@@ -226,7 +253,7 @@ async def create_profile(
         from services.model_manager import get_model_status
         audio_path = os.path.join(VOICES_DIR, f"{profile_id}.wav")
         audio_filename = None
-        if get_model_status()["loaded"]:
+        if design_engine == "omnivoice" and get_model_status()["loaded"]:
             try:
                 await _render_archetype_wav(
                     {
@@ -257,10 +284,10 @@ async def create_profile(
         with db_conn() as conn:
             conn.execute(
                 "INSERT INTO voice_profiles (id, name, ref_audio_path, ref_text, instruct, "
-                "language, seed, personality, kind, vd_states, created_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "language, seed, personality, kind, vd_states, design_recipe, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (profile_id, name, audio_filename, ref_text, instruct, language,
-                 used_seed, personality, kind, vd_states, time.time())
+                 used_seed, personality, kind, vd_states, stored_recipe, time.time())
             )
     except Exception:
         if os.path.exists(portrait_path):
@@ -315,7 +342,7 @@ def update_profile(profile_id: str, patch: ProfileUpdate):
     """Partial update — only fields set on the payload are changed."""
     with db_conn() as conn:
         existing = conn.execute(
-            "SELECT kind FROM voice_profiles WHERE id = ?", (profile_id,),
+            "SELECT kind, instruct FROM voice_profiles WHERE id = ?", (profile_id,),
         ).fetchone()
     if not existing:
         raise HTTPException(
@@ -347,6 +374,13 @@ def update_profile(profile_id: str, patch: ProfileUpdate):
 
         fields.append("vd_states = ?")
         params.append(json.dumps(instruct_to_vd_states(edited_instruct)))
+        if edited_instruct != (existing["instruct"] or ""):
+            # A legacy tag editor cannot edit the native prose recipe. Treat
+            # this deliberate instruction change as a new design, rather
+            # than silently replaying stale prose or cloning its old sample.
+            # The preview materializer replaces the old WAV atomically on
+            # the next request; metadata-only edits retain their recipe.
+            fields.extend(("design_recipe = NULL", "ref_audio_path = NULL"))
     if not fields:
         raise HTTPException(
             status_code=400,
@@ -794,12 +828,16 @@ _PROFILE_ID_RE = re.compile(r"[A-Za-z0-9_-]{1,64}")
 
 @router.get("/profiles/{profile_id}/audio")
 async def get_profile_audio(profile_id: str):
+    """Serve a saved voice sample or lazily render a pending designed voice.
+
+    Profile IDs and stored filenames are confined to VOICES_DIR; concurrent
+    sample requests share a single synthesis job and never expose partial WAVs.
+    """
     if not _PROFILE_ID_RE.fullmatch(profile_id or ""):
         return Response("Profile not found", status_code=404)
     with db_conn() as conn:
         row = conn.execute(
-            "SELECT ref_audio_path, locked_audio_path, kind, instruct, language, ref_text "
-            "FROM voice_profiles WHERE id=?",
+            "SELECT * FROM voice_profiles WHERE id=?",
             (profile_id,),
         ).fetchone()
     if not row:
@@ -820,6 +858,77 @@ async def get_profile_audio(profile_id: str):
     if audio_path is None or not os.path.exists(audio_path):
         return Response("Audio file missing", status_code=404)
     return FileResponse(audio_path, media_type=_audio_media_type(audio_path))
+
+
+async def _render_native_design_sample(row, audio_path, engine_id: str) -> None:
+    """Create a pending sample with the same free-form engine as the profile.
+
+    Only the OmniVoice tag engine uses archetypes' specialised renderer.
+    A native free-form profile must never be rendered with OmniVoice instead:
+    that either rejects its description or stores a completely different voice.
+    """
+    from pathlib import Path
+    from api.routers.archetypes import _FALLBACK_SCRIPT
+    from api.routers.generation import _safe_torchaudio_save, run_on_gpu_pool_guarded
+    from core.audio_validation import is_playable_wav
+    from api.routers.engines import _get_engine_instance
+    from services import gpu_gateway
+    from services.engine_memory import evict_other_tts_engines
+    from services.model_manager import generate_timeout_s
+    from services.tts_backend import get_backend_class
+    from services.voice_design_profiles import profile_instruct
+    from services.performance_profiles import tts_defaults
+
+    backend_cls = get_backend_class(engine_id)
+    ready, reason = backend_cls.is_available()
+    if not ready:
+        raise RuntimeError(f"{engine_id} is not installed or ready: {reason}")
+    # Match /generate's single-active-engine and cached-instance lifecycle:
+    # a preview must not spawn another multi-GB model beside a warm engine.
+    await evict_other_tts_engines(engine_id)
+    backend = _get_engine_instance(backend_cls)
+    await gpu_gateway.prewarm(backend=backend, engine=engine_id)
+    script = (row["ref_text"] or "").strip() or _FALLBACK_SCRIPT
+    instruct = profile_instruct(row, engine_id)
+    language = row["language"] or None
+    steps = tts_defaults(engine_id).get("num_step", 10)
+    seed = row["seed"] if row["seed"] is not None else _DESIGN_SEED
+
+    def render():
+        """Render the pending identity with the authoring engine and seed."""
+        import torch
+        torch.manual_seed(seed)
+        extra = (
+            {"seed": seed}
+            if getattr(backend, "supports_generation_seed", False) else {}
+        )
+        return backend.generate(
+            script, ref_audio=None, ref_text=None, instruct=instruct,
+            language=language, num_step=steps, guidance_scale=2.0, speed=1.0,
+            **extra,
+        )
+
+    audio = await run_on_gpu_pool_guarded(
+        render, what="Native design profile sample",
+        timeout=generate_timeout_s(script, engine=backend),
+    )
+    # Keep synthetic profile samples on the same AudioSeal provenance path
+    # as OmniVoice's archetype renderer. Never watermark user reference clips.
+    from services.watermark import mark_synthetic_async
+    audio = await mark_synthetic_async(
+        audio, backend.sample_rate, context="profiles.native_design",
+        timeout=generate_timeout_s(""),
+    )
+    path = Path(audio_path)
+    tmp = path.with_name(f".{path.stem}-{uuid.uuid4().hex}.wav")
+    try:
+        _safe_torchaudio_save(str(tmp), audio, backend.sample_rate)
+        if not is_playable_wav(tmp):
+            raise RuntimeError("Voice engine generated an invalid preview sample")
+        os.replace(tmp, path)
+    finally:
+        with contextlib.suppress(OSError):
+            tmp.unlink()
 
 
 async def _materialize_design_sample(profile_id: str, row) -> Optional[str]:
@@ -848,18 +957,24 @@ async def _materialize_design_sample(profile_id: str, row) -> Optional[str]:
         raise HTTPException(status_code=400, detail="invalid profile identifier")
 
     async def _materialize() -> None:
-        # Atomic + validated: a concurrent or interrupted request must never
-        # serve (or persist) a half-written sample. Shared via _render_once, so
-        # repeat clicks join one render and a dropped request still finishes it.
-        await _render_wav_atomic(
-            {
-                "language": row["language"] or "Auto",
-                "sample_script": row["ref_text"] or "",
-                "instruct": row["instruct"] or "",
-            },
-            Path(audio_path),
-            prefix=f".{profile_id}-",
-        )
+        """Render once with the authoring engine and atomically link the WAV."""
+        # Atomic + validated: concurrent callers join via _render_once and
+        # a failed render never publishes a half-written sample.
+        from services.voice_design_profiles import recipe_engine
+
+        engine_id = recipe_engine(row)
+        if engine_id == "omnivoice":
+            await _render_wav_atomic(
+                {
+                    "language": row["language"] or "Auto",
+                    "sample_script": row["ref_text"] or "",
+                    "instruct": row["instruct"] or "",
+                },
+                Path(audio_path),
+                prefix=f".{profile_id}-",
+            )
+        else:
+            await _render_native_design_sample(row, audio_path, engine_id)
         with db_conn() as conn:
             conn.execute(
                 "UPDATE voice_profiles SET ref_audio_path=? WHERE id=?",

@@ -120,6 +120,214 @@ def test_design_save_drops_object_object_instruct(app_client, fake_render):
     assert profile["instruct"] == "female, young adult, high pitch"
 
 
+def test_native_voice_design_profile_keeps_full_description(app_client):
+    """Saving a VoxCPM2 voice cannot silently collapse its prose to tags."""
+    from api.routers.generation import _resolve_profile_conditioning
+    from core.db import db_conn
+    from services.voice_design_profiles import profile_instruct
+
+    client, _ = app_client
+    raw = {
+        "description": "A soft-spoken Japanese narrator, a little breathy and introspective.",
+        "picks": {"Pitch": "low pitch"},
+    }
+    r = client.post("/profiles", data={
+        "name": "Native Designer", "kind": "design", "engine": "voxcpm2",
+        "vd_states": json.dumps(_VD), "design_recipe": json.dumps(raw),
+    })
+    assert r.status_code == 200, r.text
+    profile = r.json()
+    assert profile["ref_audio_path"] is None  # no accidental OmniVoice rendering
+    assert profile["instruct"] == "female, young adult, high pitch"
+    stored = json.loads(profile["design_recipe"])
+    assert stored["description"] == raw["description"]
+    assert stored["engine"] == "voxcpm2"
+    assert stored["picks"] == raw["picks"]
+
+    with db_conn() as conn:
+        row = conn.execute("SELECT * FROM voice_profiles WHERE id=?", (profile["id"],)).fetchone()
+    assert profile_instruct(row, "omnivoice") == "female, young adult, high pitch"
+    assert profile_instruct(row, "voxcpm2") == raw["description"] + ", low pitch"
+    cond = _resolve_profile_conditioning(row, engine_id="voxcpm2")
+    assert cond["instruct"] == raw["description"] + ", low pitch"
+    assert cond["ref_audio_path"] is None
+    # The Design workspace sends this same instruction; it must not be
+    # mistaken for a different identity and clear the saved profile link.
+    assert not _resolve_profile_conditioning(
+        row, engine_id="voxcpm2", instruct=cond["instruct"], seed=profile["seed"]
+    )["diverged"]
+
+
+def test_native_profile_preview_uses_its_authoring_engine(app_client, monkeypatch):
+    """A saved VoxCPM2 voice must not silently render an OmniVoice sample."""
+    client, _ = app_client
+    import api.routers.profiles as profiles_router
+
+    recipe = {"description": "a soft warm narrator", "picks": {}}
+    created = client.post("/profiles", data={
+        "name": "Native Preview", "kind": "design", "engine": "voxcpm2",
+        "vd_states": json.dumps(_VD), "design_recipe": json.dumps(recipe),
+    })
+    assert created.status_code == 200, created.text
+    profile_id = created.json()["id"]
+    called = []
+
+    async def fake_render(row, path, engine_id):
+        """Write a stub identity WAV while recording the chosen model."""
+        import wave
+        called.append((row["design_recipe"], engine_id))
+        with wave.open(str(path), "wb") as wav:
+            wav.setnchannels(1)
+            wav.setsampwidth(2)
+            wav.setframerate(24000)
+            wav.writeframes(b"\\x01\\x00" * 24000)
+
+    monkeypatch.setattr(profiles_router, "_render_native_design_sample", fake_render)
+    audio = client.get(f"/profiles/{profile_id}/audio")
+    assert audio.status_code == 200, audio.text[:300] if audio.status_code != 200 else ""
+    assert audio.headers["content-type"].startswith("audio/")
+    assert len(called) == 1 and called[0][1] == "voxcpm2"
+    assert json.loads(called[0][0])["description"] == recipe["description"]
+    profile = client.get(f"/profiles/{profile_id}").json()
+    assert profile["ref_audio_path"] == profile_id + ".wav"
+    assert client.get(f"/profiles/{profile_id}/audio").status_code == 200
+    assert len(called) == 1
+
+
+@pytest.mark.asyncio
+async def test_native_preview_reuses_engine_cache_and_sends_seed(tmp_path, monkeypatch):
+    """Pending samples use the shared engine and forward seeds to sidecars."""
+    import torch
+    from api.routers import engines as engines_router
+    from api.routers import generation as generation_router
+    from api.routers import profiles as profiles_router
+    from services import engine_memory, gpu_gateway, tts_backend, watermark
+
+    class StubBackend:
+        """An in-memory engine with a real WAV tensor and seed-aware protocol."""
+        id = "voxcpm2"
+        supports_generation_seed = True
+        instruct_vocabulary = "freeform"
+        sample_rate = 24000
+
+        @classmethod
+        def is_available(cls):
+            """Pretend a previously installed sidecar is healthy."""
+            return True, "ready"
+
+        def generate(self, text, **kw):
+            """Record the actual kwargs a sidecar would receive."""
+            calls.append(kw)
+            return torch.ones(1, 24000) * 0.1
+
+    calls = []
+    engine = StubBackend()
+    cached = []
+    prewarmed = []
+    evicted = []
+
+    def get_cached(cls):
+        """Return the same adapter instance across independent previews."""
+        cached.append(cls)
+        return engine
+
+    async def prewarm(*, backend, engine, **kw):
+        """Record model readiness without starting GPU workers."""
+        prewarmed.append((backend, engine))
+
+    async def evict(engine_id):
+        """Track the single-active-engine eviction request."""
+        evicted.append(engine_id)
+
+    async def run_guarded(fn, **kw):
+        """Execute stub synthesis instead of dispatching to the real GPU."""
+        return fn()
+
+    async def passthrough(wav, sample_rate, **kw):
+        """Skip provenance cost while preserving the generated tensor."""
+        return wav
+
+    monkeypatch.setattr(tts_backend, "get_backend_class", lambda name: StubBackend)
+    monkeypatch.setattr(engines_router, "_get_engine_instance", get_cached)
+    monkeypatch.setattr(gpu_gateway, "prewarm", prewarm)
+    monkeypatch.setattr(engine_memory, "evict_other_tts_engines", evict)
+    monkeypatch.setattr(generation_router, "run_on_gpu_pool_guarded", run_guarded)
+    monkeypatch.setattr(watermark, "mark_synthetic_async", passthrough)
+
+    row = {
+        "kind": "design", "ref_text": "Speak softly.", "language": "Auto",
+        "instruct": "female", "vd_states": None, "seed": 123,
+        "design_recipe": json.dumps({
+            "description": "Warm and gentle narration.", "picks": {},
+            "engine": "voxcpm2",
+        }),
+    }
+    for i in range(2):
+        await profiles_router._render_native_design_sample(
+            row, str(tmp_path / f"sample-{i}.wav"), "voxcpm2",
+        )
+        assert (tmp_path / f"sample-{i}.wav").is_file()
+    assert cached == [StubBackend, StubBackend]
+    assert prewarmed == [(engine, "voxcpm2")] * 2
+    assert evicted == ["voxcpm2", "voxcpm2"]
+    assert len(calls) == 2
+    assert all(call["seed"] == 123 for call in calls)
+    assert all(call["instruct"] == "Warm and gentle narration." for call in calls)
+
+
+def test_editing_native_design_invalidates_stale_recipe_and_reference(app_client):
+    """Legacy tag edits intentionally replace stale prose and sample identity."""
+    from core.db import db_conn
+
+    client, _ = app_client
+    recipe = {
+        "description": "A warm Japanese narrator, slightly breathy and restrained.",
+        "picks": {"Age": "young adult"},
+    }
+    response = client.post("/profiles", data={
+        "name": "Edited native design", "kind": "design", "engine": "voxcpm2",
+        "vd_states": json.dumps(_VD), "design_recipe": json.dumps(recipe),
+    })
+    assert response.status_code == 200, response.text
+    pid = response.json()["id"]
+    assert response.json()["design_recipe"]
+
+    # Changing only the profile name or saving the same tags preserves recipe.
+    unchanged = client.put(f"/profiles/{pid}", json={"name": "New name"})
+    assert unchanged.status_code == 200
+    assert json.loads(unchanged.json()["design_recipe"])["description"] == recipe["description"]
+    tags = unchanged.json()["instruct"]
+    unchanged_tags = client.put(f"/profiles/{pid}", json={"instruct": tags})
+    assert unchanged_tags.status_code == 200
+    assert unchanged_tags.json()["design_recipe"]
+
+    # An actual tag change must not secretly reapply the old free-form prose.
+    with db_conn() as conn:
+        conn.execute("UPDATE voice_profiles SET ref_audio_path=? WHERE id=?", (
+            f"{pid}.wav", pid,
+        ))
+    changed = client.put(f"/profiles/{pid}", json={"instruct": "female, low pitch"})
+    assert changed.status_code == 200, changed.text
+    assert changed.json()["instruct"] == "female, low pitch"
+    assert changed.json()["design_recipe"] is None
+    assert changed.json()["ref_audio_path"] is None
+    assert json.loads(changed.json()["vd_states"])["Pitch"] == "low pitch"
+
+
+def test_native_profile_rejects_invalid_recipe_and_reference_only_engine(app_client):
+    """Disallow malformed freeform inputs and reference-only design engines."""
+    client, _ = app_client
+    data = {
+        "name": "Invalid", "kind": "design", "engine": "voxcpm2",
+        "vd_states": json.dumps(_VD),
+    }
+    assert client.post("/profiles", data={**data, "design_recipe": "{broken"}).status_code == 422
+    assert client.post("/profiles", data={
+        **data, "engine": "indextts2",
+        "design_recipe": json.dumps({"description": "low smoky voice", "picks": {}}),
+    }).status_code == 422
+
+
 def test_design_rejects_malformed_vd_states(app_client):
     client, _ = app_client
     r = client.post(

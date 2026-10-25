@@ -124,6 +124,7 @@ export function DesignPage() {
       );
     }
   };
+  /** Persist the native description and category picks alongside legacy tags. */
   const save = async () => {
     if (!name.trim() || saving) return;
     setSaving(true);
@@ -135,6 +136,15 @@ export function DesignPage() {
       body.set('seed', String(draft.seed));
       body.set('vd_states', JSON.stringify(draft.attrs));
       body.set('instruct', buildDesignInstruct(draft.attrs, '').instruct);
+      body.set('design_recipe', JSON.stringify(designRecipe(draft)));
+      // A reference-only engine can reuse a saved sample, but cannot design a
+      // fresh one. Keep the legacy OmniVoice authoring fallback for that case.
+      body.set(
+        'engine',
+        activeEngine?.supports_voice_design === false
+          ? 'omnivoice'
+          : (activeEngine?.id ?? 'omnivoice'),
+      );
       body.set('language', cloneSettingsStore.state.language);
       const created = await apiJson<Profile>('/profiles', {
         method: 'POST',
@@ -270,6 +280,9 @@ export function DesignPage() {
                           attrs: restored.attrs,
                           seed: restored.seed,
                           profileId: restored.profileId,
+                          description: restored.description,
+                          picks: restored.picks,
+                          mapped: restored.mapped,
                         }),
                       );
                       setCloneSetting('language', restored.language);
