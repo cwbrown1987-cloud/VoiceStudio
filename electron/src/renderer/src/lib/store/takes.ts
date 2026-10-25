@@ -40,13 +40,26 @@ export function rememberTake(id: string | null, settings: CloneSettings) {
     /* History still works if local metadata cannot be saved. */
   }
 }
+/** Restore saved take parameters without carrying emotion over from another take.
+ *
+ * Older history has no emotion fields. Treat missing (or corrupt) emotion
+ * settings as Off, while preserving correctly saved text/vector controls.
+ * Script, voice identity, and language always come from the history entry.
+ */
 export function takeSettings(item: HistoryItem): Partial<TakeSettings> {
-  const fallback = {
+  const identity = {
     text: item.text,
     language: item.language || 'Auto',
     instruct: item.instruct || '',
     selectedProfileId: item.profile_id,
   };
+  const neutralEmotion = {
+    emotionMode: DEFAULT_CLONE_SETTINGS.emotionMode,
+    emotionText: DEFAULT_CLONE_SETTINGS.emotionText,
+    emotionAlpha: DEFAULT_CLONE_SETTINGS.emotionAlpha,
+    emotionVector: [...DEFAULT_CLONE_SETTINGS.emotionVector],
+  };
+  const fallback = { ...neutralEmotion, ...identity };
   try {
     const raw = JSON.parse(localStorage.getItem(key) ?? '{}')?.[item.id];
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return fallback;
@@ -56,7 +69,7 @@ export function takeSettings(item: HistoryItem): Partial<TakeSettings> {
     for (const name of Object.keys(DEFAULT_CLONE_SETTINGS) as Array<keyof CloneSettings>)
       if (!PREFERENCES.has(name) && name in raw && acceptsCloneSetting(name, raw[name]))
         safe[name] = raw[name];
-    return { ...safe, ...fallback };
+    return { ...neutralEmotion, ...safe, ...identity };
   } catch {
     return fallback;
   }

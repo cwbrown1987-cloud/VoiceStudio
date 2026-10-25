@@ -45,6 +45,7 @@ import { cn } from '@/lib/utils';
 import { EngineLanguagePicker } from './engine-language-picker';
 import { PresetVoicePicker } from './preset-voice-picker';
 import { QualityControls } from './quality-controls';
+import { EmotionControls } from './emotion-controls';
 import { CloneDemoAction } from './clone-demo';
 import { useCloneDemo } from '@/hooks/use-clone-demo';
 
@@ -138,10 +139,7 @@ function SliderRow({ spec, value }: SliderRowProps) {
   return (
     <div className="flex min-w-0 flex-col gap-2 px-1 py-2">
       <div className="flex items-center justify-between gap-2">
-        <span
-          id={labelId}
-          className="inline-flex items-center gap-1.5 text-xs font-medium"
-        >
+        <span id={labelId} className="inline-flex items-center gap-1.5 text-xs font-medium">
           <Icon className="size-3.5 text-muted-foreground" aria-hidden="true" />
           {t(spec.labelKey)}
         </span>
@@ -320,6 +318,7 @@ export function VoiceControls({ size = 'icon-lg' }: { size?: 'icon-sm' | 'icon-l
   );
 }
 
+/** Render the Voice Cloning composer including engine-aware emotion controls. */
 export function ActionBar() {
   const { t } = useTranslation();
   const demo = useCloneDemo();
@@ -365,14 +364,14 @@ export function ActionBar() {
               blocker === 'cloning'
                 ? 'convert.cloning_required'
                 : blocker === 'engine'
-                ? demo
-                  ? 'demo.prerendered_chip'
-                  : 'engines.none_ready_title'
-                : blocker === 'reference'
-                  ? 'tts_errors.upload_or_select'
-                  : blocker === 'text'
-                    ? 'tts_errors.enter_text'
-                    : 'preferences.loading',
+                  ? demo
+                    ? 'demo.prerendered_chip'
+                    : 'engines.none_ready_title'
+                  : blocker === 'reference'
+                    ? 'tts_errors.upload_or_select'
+                    : blocker === 'text'
+                      ? 'tts_errors.enter_text'
+                      : 'preferences.loading',
             )}
           </span>
           {blocker === 'reference' && (
@@ -422,6 +421,7 @@ export function ActionBar() {
           <span aria-hidden="true" className="mx-1 h-4 w-px bg-border" />
           <QualityControls disabled={isGenerating} />
           <VoiceControls />
+          <EmotionControls disabled={isGenerating} />
         </div>
 
         <div className="relative ml-auto flex shrink-0 gap-2">

@@ -1,4 +1,18 @@
 {
+  "cloneEmotion": {
+    "title": "อารมณ์",
+    "off": "ปิด",
+    "text": "คำอธิบาย",
+    "vector": "แถบเลื่อน",
+    "happy": "มีความสุข",
+    "angry": "โกรธ",
+    "sad": "เศร้า",
+    "afraid": "กลัว",
+    "disgusted": "รังเกียจ",
+    "melancholic": "หม่นเศร้า",
+    "surprised": "ประหลาดใจ",
+    "calm": "สงบ"
+  },
   "cloneQuality": {
     "title": "คุณภาพเสียง",
     "precision": "ความละเอียด WAV",

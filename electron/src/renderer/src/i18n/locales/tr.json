@@ -1,4 +1,18 @@
 {
+  "cloneEmotion": {
+    "title": "Duygu",
+    "off": "Kapalı",
+    "text": "Açıklama",
+    "vector": "Kaydırıcılar",
+    "happy": "Mutluluk",
+    "angry": "Öfke",
+    "sad": "Üzüntü",
+    "afraid": "Korku",
+    "disgusted": "İğrenme",
+    "melancholic": "Melankoli",
+    "surprised": "Şaşkınlık",
+    "calm": "Sakinlik"
+  },
   "cloneQuality": {
     "title": "Ses kalitesi",
     "precision": "WAV hassasiyeti",

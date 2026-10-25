@@ -1,4 +1,18 @@
 {
+  "cloneEmotion": {
+    "title": "Емоція",
+    "off": "Вимк.",
+    "text": "Опис",
+    "vector": "Повзунки",
+    "happy": "Радість",
+    "angry": "Гнів",
+    "sad": "Смуток",
+    "afraid": "Страх",
+    "disgusted": "Огида",
+    "melancholic": "Меланхолія",
+    "surprised": "Здивування",
+    "calm": "Спокій"
+  },
   "cloneQuality": {
     "title": "Якість звуку",
     "precision": "Точність WAV",

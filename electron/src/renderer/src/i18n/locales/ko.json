@@ -1,4 +1,18 @@
 {
+  "cloneEmotion": {
+    "title": "감정",
+    "off": "끄기",
+    "text": "설명",
+    "vector": "감정 슬라이더",
+    "happy": "기쁨",
+    "angry": "분노",
+    "sad": "슬픔",
+    "afraid": "두려움",
+    "disgusted": "혐오",
+    "melancholic": "우울",
+    "surprised": "놀람",
+    "calm": "평온"
+  },
   "cloneQuality": {
     "title": "오디오 품질",
     "precision": "WAV 정밀도",

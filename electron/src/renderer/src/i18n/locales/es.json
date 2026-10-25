@@ -1,4 +1,18 @@
 {
+  "cloneEmotion": {
+    "title": "Emoción",
+    "off": "Desactivado",
+    "text": "Descripción",
+    "vector": "Deslizadores",
+    "happy": "Alegría",
+    "angry": "Ira",
+    "sad": "Tristeza",
+    "afraid": "Miedo",
+    "disgusted": "Asco",
+    "melancholic": "Melancolía",
+    "surprised": "Sorpresa",
+    "calm": "Calma"
+  },
   "cloneQuality": {
     "title": "Calidad de audio",
     "precision": "Precisión WAV",

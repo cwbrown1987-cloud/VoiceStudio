@@ -1,4 +1,18 @@
 {
+  "cloneEmotion": {
+    "title": "Emosi",
+    "off": "Nonaktif",
+    "text": "Deskripsi",
+    "vector": "Penggeser",
+    "happy": "Senang",
+    "angry": "Marah",
+    "sad": "Sedih",
+    "afraid": "Takut",
+    "disgusted": "Jijik",
+    "melancholic": "Melankolis",
+    "surprised": "Terkejut",
+    "calm": "Tenang"
+  },
   "cloneQuality": {
     "title": "Kualitas audio",
     "precision": "Presisi WAV",

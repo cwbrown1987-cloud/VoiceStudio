@@ -1,4 +1,18 @@
 {
+  "cloneEmotion": {
+    "title": "Känsla",
+    "off": "Av",
+    "text": "Beskrivning",
+    "vector": "Reglage",
+    "happy": "Glädje",
+    "angry": "Ilska",
+    "sad": "Sorg",
+    "afraid": "Rädsla",
+    "disgusted": "Avsky",
+    "melancholic": "Melankoli",
+    "surprised": "Förvåning",
+    "calm": "Lugn"
+  },
   "cloneQuality": {
     "title": "Ljudkvalitet",
     "precision": "WAV-precision",

@@ -1,4 +1,18 @@
 {
+  "cloneEmotion": {
+    "title": "Эмоция",
+    "off": "Выкл.",
+    "text": "Описание",
+    "vector": "Ползунки",
+    "happy": "Радость",
+    "angry": "Гнев",
+    "sad": "Грусть",
+    "afraid": "Страх",
+    "disgusted": "Отвращение",
+    "melancholic": "Меланхолия",
+    "surprised": "Удивление",
+    "calm": "Спокойствие"
+  },
   "cloneQuality": {
     "title": "Качество звука",
     "precision": "Точность WAV",

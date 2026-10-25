@@ -1,4 +1,18 @@
 {
+  "cloneEmotion": {
+    "title": "العاطفة",
+    "off": "إيقاف",
+    "text": "وصف",
+    "vector": "منزلقات",
+    "happy": "السعادة",
+    "angry": "الغضب",
+    "sad": "الحزن",
+    "afraid": "الخوف",
+    "disgusted": "الاشمئزاز",
+    "melancholic": "الكآبة",
+    "surprised": "المفاجأة",
+    "calm": "الهدوء"
+  },
   "cloneQuality": {
     "title": "جودة الصوت",
     "precision": "دقة WAV",

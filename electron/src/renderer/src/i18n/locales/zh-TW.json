@@ -1,4 +1,18 @@
 {
+  "cloneEmotion": {
+    "title": "情緒",
+    "off": "關閉",
+    "text": "文字描述",
+    "vector": "情緒滑桿",
+    "happy": "喜悅",
+    "angry": "憤怒",
+    "sad": "悲傷",
+    "afraid": "恐懼",
+    "disgusted": "厭惡",
+    "melancholic": "憂鬱",
+    "surprised": "驚訝",
+    "calm": "平靜"
+  },
   "cloneQuality": {
     "title": "音訊品質",
     "precision": "WAV 精度",

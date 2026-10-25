@@ -15,7 +15,7 @@ ignores.
 | Laughter or a sigh | ⊕ Insert → `[laughter]` / `[sigh]` | Default engine (VoiceStudio) |
 | An audible breath **on demand** | `[breath]` in the text | CosyVoice 3 only (opt-in) — see [Breaths](#breaths-specifically) |
 | Whispering | Style → `whisper` (the voice-design/style field) | Default engine |
-| Emotion ("excited", "sad", graded intensity) | IndexTTS2's emotion controls — Audiobook tab's Production Overrides, or the `/ws/tts` API — or CosyVoice 3 instruct | Opt-in engines only |
+| Emotion ("excited", "sad", graded intensity) | IndexTTS2's **Voice Cloning → Emotion** controls, Audiobook Production Overrides, or `/generate` / `/ws/tts` APIs; CosyVoice 3 also accepts instruct | Opt-in engines only |
 | The same take again | Pin the seed / lock the profile | Default engine |
 
 ## Recovering an interrupted audiobook
@@ -106,8 +106,8 @@ parentheses; details in [generation-parameters.md](generation-parameters.md)):
 - `postprocess_output` (on) — removes long silences from the output. Turn it
   off when the silence *is* the performance.
 
-The Audiobook panel adds two longform-only controls on top of that surface:
-IndexTTS2 emotion (see below), and **Vary repeated lines** — a cache opt-out
+The Audiobook panel adds two additional production controls:
+IndexTTS2 emotion (also available in Voice Cloning; see below), and **Vary repeated lines** — a cache opt-out
 that gives every identical line its own take instead of replaying one recording
 (off by default, so books stay byte-reproducible unless you ask for variety).
 
@@ -172,14 +172,28 @@ guidance, not a guarantee — adherence varies by voice and language.
 The only engine with **graded** emotion control: an 8-value emotion vector
 (happy, angry, sad, afraid, disgusted, melancholic, surprised, calm), an
 emotion *reference clip* whose delivery is mimicked (with a blend strength),
-or a natural-language emotion description. The **Audiobook tab's Production
-Overrides** expose the natural-language path — an *Emotion description* field
-plus an *Emotion strength* slider (`emo_alpha`), shown only when IndexTTS2 is
-the active engine so there are no dead controls. The full surface (the 8-float
-`emo_vector`, an `emo_audio` reference clip) is on the streaming WebSocket API
-(`/ws/tts` — `emo_vector`, `emo_audio`, `emo_alpha`, `emo_text` fields;
-`backend/api/routers/tts_stream.py`). The single-shot Voice page does not carry
-emotion controls yet.
+or a natural-language emotion description.
+
+In **Voice Cloning**, select IndexTTS2 and open the **Emotion** (heart-pulse)
+button beside Voice controls. The default is **Off**. Choose **Description**
+for a free-form emotion instruction with an intensity slider (0–0.6, the
+recommended maximum for text emotion in IndexTTS2), or choose **Sliders** for
+the eight individual emotion weights (0–1). The controls are available only
+when the active engine declares emotion support; the reference audio continues
+to define the speaker's voice.
+
+The **Audiobook** tab's Production Overrides also support the description and
+intensity. The multipart **`POST /generate`** API accepts either `emo_text`
+plus optional `emo_alpha`, or `emo_vector` as a JSON array of exactly eight
+finite numbers between 0 and 1. Mixing the two methods, supplying intensity
+without text, or choosing an unsupported engine returns HTTP 422 before
+loading any model. Classic audio responses and NDJSON streaming previews
+(`stream=true`) pass the same emotion controls to the engine.
+
+An independent **emotion reference clip** remains available via the WebSocket
+API `/ws/tts` (`emo_audio`, alongside the other controls;
+`backend/api/routers/tts_stream.py`). It is not yet exposed in Voice
+Cloning's Emotion popover.
 
 ## Breaths, specifically
 

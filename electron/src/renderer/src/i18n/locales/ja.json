@@ -1,4 +1,18 @@
 {
+  "cloneEmotion": {
+    "title": "感情",
+    "off": "オフ",
+    "text": "文章で指定",
+    "vector": "感情スライダー",
+    "happy": "喜び",
+    "angry": "怒り",
+    "sad": "悲しみ",
+    "afraid": "恐れ",
+    "disgusted": "嫌悪",
+    "melancholic": "憂鬱",
+    "surprised": "驚き",
+    "calm": "落ち着き"
+  },
   "cloneQuality": {
     "title": "音声品質",
     "precision": "WAV精度",

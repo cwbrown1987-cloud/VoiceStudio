@@ -1,4 +1,18 @@
 {
+  "cloneEmotion": {
+    "title": "भावना",
+    "off": "बंद",
+    "text": "विवरण",
+    "vector": "स्लाइडर",
+    "happy": "खुशी",
+    "angry": "गुस्सा",
+    "sad": "उदासी",
+    "afraid": "डर",
+    "disgusted": "घृणा",
+    "melancholic": "विषाद",
+    "surprised": "आश्चर्य",
+    "calm": "शांति"
+  },
   "cloneQuality": {
     "title": "ऑडियो गुणवत्ता",
     "precision": "WAV परिशुद्धता",

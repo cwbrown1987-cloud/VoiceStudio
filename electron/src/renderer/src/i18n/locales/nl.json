@@ -1,4 +1,18 @@
 {
+  "cloneEmotion": {
+    "title": "Emotie",
+    "off": "Uit",
+    "text": "Beschrijving",
+    "vector": "Schuifregelaars",
+    "happy": "Blijdschap",
+    "angry": "Woede",
+    "sad": "Verdriet",
+    "afraid": "Angst",
+    "disgusted": "Afkeer",
+    "melancholic": "Melancholie",
+    "surprised": "Verrassing",
+    "calm": "Kalmte"
+  },
   "cloneQuality": {
     "title": "Audiokwaliteit",
     "precision": "WAV-precisie",

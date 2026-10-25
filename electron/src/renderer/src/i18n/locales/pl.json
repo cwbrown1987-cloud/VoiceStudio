@@ -1,4 +1,18 @@
 {
+  "cloneEmotion": {
+    "title": "Emocje",
+    "off": "Wyłączone",
+    "text": "Opis",
+    "vector": "Suwaki",
+    "happy": "Radość",
+    "angry": "Złość",
+    "sad": "Smutek",
+    "afraid": "Strach",
+    "disgusted": "Wstręt",
+    "melancholic": "Melancholia",
+    "surprised": "Zaskoczenie",
+    "calm": "Spokój"
+  },
   "cloneQuality": {
     "title": "Jakość dźwięku",
     "precision": "Precyzja WAV",

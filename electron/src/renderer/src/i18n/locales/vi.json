@@ -1,4 +1,18 @@
 {
+  "cloneEmotion": {
+    "title": "Cảm xúc",
+    "off": "Tắt",
+    "text": "Mô tả",
+    "vector": "Thanh trượt",
+    "happy": "Vui vẻ",
+    "angry": "Tức giận",
+    "sad": "Buồn",
+    "afraid": "Sợ hãi",
+    "disgusted": "Ghê tởm",
+    "melancholic": "U sầu",
+    "surprised": "Ngạc nhiên",
+    "calm": "Bình tĩnh"
+  },
   "cloneQuality": {
     "title": "Chất lượng âm thanh",
     "precision": "Độ chính xác WAV",

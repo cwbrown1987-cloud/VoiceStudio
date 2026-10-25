@@ -1,4 +1,18 @@
 {
+  "cloneEmotion": {
+    "title": "情绪",
+    "off": "关闭",
+    "text": "文字描述",
+    "vector": "情绪滑块",
+    "happy": "快乐",
+    "angry": "愤怒",
+    "sad": "悲伤",
+    "afraid": "恐惧",
+    "disgusted": "厌恶",
+    "melancholic": "忧郁",
+    "surprised": "惊讶",
+    "calm": "平静"
+  },
   "cloneQuality": {
     "title": "音频质量",
     "precision": "WAV 精度",
